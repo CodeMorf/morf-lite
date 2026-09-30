@@ -7,6 +7,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-brightgreen.svg)]()
 
+![Morf Router Architecture](assets/morf_mindmap_diagram.png)
+
 ---
 
 ## 🚀 Características
