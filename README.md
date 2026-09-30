@@ -11,6 +11,10 @@
 
 ---
 
+> 📖 **Arquitectura & Visión:** Para conocer la especificación de infraestructura completa, integración con Laya, OpenRouter, Runware, Firecrawl, Tavily, Exa y las 20 fases de desarrollo, consulta el documento maestro: [**ROADMAP & ESPECIFICACIÓN DE ARQUITECTURA**](ROADMAP.md).
+
+---
+
 ## 🚀 Características
 
 - **Cero dependencias externas:** Utiliza `fetch` nativo y estándares web de streaming.
