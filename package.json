@@ -1,0 +1,50 @@
+{
+  "name": "morf-lite",
+  "version": "1.0.0",
+  "description": "Módulo cliente ligero y sin dependencias para Morf AI Smart Gateway & Auto-Router.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && node scripts/build-esm.mjs",
+    "test": "node test/test-basic.js"
+  },
+  "keywords": [
+    "morf",
+    "morf-ai",
+    "ai-gateway",
+    "auto-router",
+    "llm",
+    "openai-compatible",
+    "deepseek",
+    "mistral",
+    "groq"
+  ],
+  "author": "CodeMorf",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CodeMorf/morf-lite.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CodeMorf/morf-lite/issues"
+  },
+  "homepage": "https://morf.codes",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}
