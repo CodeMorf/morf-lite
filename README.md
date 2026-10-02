@@ -228,6 +228,23 @@ nombre y `morf-ai-auto`. Mantén las herramientas de proyecto en Doable y devuel
 sus resultados al gateway. La compatibilidad de protocolo no certifica por sí sola
 la edición, el build y el preview de una instalación de Doable.
 
+La conexión comprobada con su `CopilotEngine` usa:
+
+| Configuración | Valor |
+| --- | --- |
+| Tipo de proveedor | `openai` |
+| Base URL | `https://morf.codes/gateway/v1` |
+| Modelo | `morf-ai-auto` |
+| Wire API | `completions` o `responses` |
+| Credencial | Clave Morf del cliente, almacenada en la configuración privada |
+
+Los dos protocolos completaron una lectura real de `README.md` mediante una
+herramienta del cliente. Se utilizó el SDK 0.2.0 y el CLI 1.0.16 fijados en el
+lockfile de Doable. Una prueba con CLI 1.0.91 no completó esa lectura; conserva
+las versiones del lockfile al reproducir la integración. Las herramientas deben
+tener permiso explícito en la política del proyecto; conserva el aislamiento,
+los límites y los controles de escritura y de shell.
+
 ## Capacidades y control del gasto
 
 `client.capabilities.list()` enumera búsqueda web, extracción de páginas, imagen
@@ -235,7 +252,12 @@ y vídeo. `execute(name, arguments)` ejecuta la capacidad real. La generación
 reserva saldo y liquida el consumo reportado, con `max_cost_usd` como límite del
 cliente. Los trabajos de vídeo devuelven un `job_id`; consulta su `poll_url` sin
 crear otro trabajo. Para audio y vídeo automático usa un `request_id` estable.
-Si falta saldo operativo en un servicio, el error debe resolverse en su cuenta.
+Si un servicio rechaza por créditos insuficientes, el gateway lo pausa y busca
+una ruta compatible dentro del presupuesto. El cron vuelve a comprobar los
+proveedores cada dos horas. Si ninguna alternativa verificada es compatible o
+cabe en el presupuesto, la petición termina con un error; no anuncia un resultado
+multimedia inexistente. Los proveedores sin consulta verificable de saldo se
+muestran como saldo desconocido y se recuperan mediante una prueba posterior.
 
 La política automática busca un 80% de tokens de programación en las rutas base
 y limita el uso premium al 10% del consumo ya medido. El caché depende del modelo,
