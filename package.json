@@ -20,7 +20,7 @@
   ],
   "scripts": {
     "build": "tsc && node scripts/build-esm.mjs",
-    "test": "node test/test-basic.js"
+    "test": "node test/test-basic.js && node test/test-streams.js"
   },
   "keywords": [
     "morf",

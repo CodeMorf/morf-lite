@@ -18,6 +18,7 @@ __exportStar(require("./types"), exports);
 __exportStar(require("./stream"), exports);
 __exportStar(require("./session"), exports);
 __exportStar(require("./client"), exports);
+__exportStar(require("./cli"), exports);
 const client_1 = require("./client");
 exports.default = client_1.MorfClient;
 //# sourceMappingURL=index.js.map
