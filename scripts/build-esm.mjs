@@ -15,6 +15,8 @@ export const Morf = cjs.Morf;
 export const MorfSession = cjs.MorfSession;
 export const MorfError = cjs.MorfError;
 export const parseEventStream = cjs.parseEventStream;
+export const parseRunEvents = cjs.parseRunEvents;
+export const createCliExecutor = cjs.createCliExecutor;
 `;
 
 fs.writeFileSync(path.join(distDir, 'index.mjs'), esmContent, 'utf-8');

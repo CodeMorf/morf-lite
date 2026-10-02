@@ -6,7 +6,7 @@ import {
   ModelListResponse,
   GatewayStatsResponse,
 } from './types';
-import { parseEventStream } from './stream';
+import { parseEventStream, parseRunEvents } from './stream';
 import { MorfSession, SessionOptions } from './session';
 
 export class MorfError extends Error {
@@ -78,6 +78,56 @@ export class MorfClient {
   }
 
   // --- Namespace Chat ---
+  private async json(path: string, body?: unknown): Promise<any> {
+    const response = await this.request(path, body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) });
+    const data = await response.json();
+    if (!response.ok) throw new MorfError(data?.error?.message || data?.error?.code || `HTTP ${response.status}`, response.status, data);
+    return data;
+  }
+
+  readonly memory = {
+    snapshot: (morf: ChatCompletionOptions['morf'] = {}) => this.json('/memory/snapshot', { morf }),
+    delete: (morf: ChatCompletionOptions['morf'] = {}) => this.json('/memory/delete', { morf }),
+  };
+
+  readonly capabilities = {
+    list: () => this.json('/capabilities'),
+    execute: (name: string, arguments_: Record<string, unknown>) => this.json('/capabilities/execute', { name, arguments: arguments_ }),
+  };
+
+  readonly runs = {
+    create: (params: Omit<ChatCompletionOptions, 'stream'> & { max_agents?: number }) => this.json('/runs', params),
+    get: (runId: string) => this.json(`/runs/${encodeURIComponent(runId)}`),
+    cancel: (runId: string) => this.json(`/runs/${encodeURIComponent(runId)}/cancel`, {}),
+    toolRequest: (runId: string, callId: string) => this.json(`/runs/${encodeURIComponent(runId)}/tools/${encodeURIComponent(callId)}`),
+    toolResult: (runId: string, callId: string, result: { content: unknown; is_error?: boolean }) => this.json(`/runs/${encodeURIComponent(runId)}/tools/${encodeURIComponent(callId)}/result`, result),
+    events: async (runId: string, after = 0): Promise<AsyncIterable<Record<string, any>>> => {
+      const response = await this.request(`/runs/${encodeURIComponent(runId)}/events?after=${Math.max(0, after)}`);
+      if (!response.ok || !response.body) throw new MorfError('No se pudo abrir el flujo de eventos', response.status);
+      return parseRunEvents(response.body, this.timeout);
+    },
+    work: async (runId: string, executor: (name: string, args: Record<string, unknown>) => Promise<unknown>, onEvent?: (event: Record<string, any>) => void): Promise<void> => {
+      const pending = new Set<Promise<void>>();
+      let terminal: Record<string, any> | undefined;
+      for await (const event of await this.runs.events(runId)) {
+        onEvent?.(event);
+        if (['run.completed', 'run.failed', 'run.cancelled'].includes(event.type)) terminal = event;
+        if (event.type !== 'tool.requested') continue;
+        const work = (async () => {
+          const task = await this.runs.toolRequest(runId, event.call_id);
+          let result: { content: unknown; is_error?: boolean };
+          try { result = { content: await executor(task.tool_name, task.arguments) }; }
+          catch (error: any) { result = { content: String(error?.message || error), is_error: true }; }
+          await this.runs.toolResult(runId, event.call_id, result);
+        })();
+        pending.add(work);
+        work.then(() => pending.delete(work), () => {});
+      }
+      await Promise.all(pending);
+      if (terminal?.type !== 'run.completed') throw new MorfError(terminal?.error || 'El run no se completo', 502, terminal);
+    },
+  };
+
   readonly chat = {
     completions: {
       create: (async (params: ChatCompletionOptions): Promise<ChatCompletionResponse | AsyncIterable<ChatCompletionChunk>> => {
@@ -93,6 +143,10 @@ export class MorfClient {
           stop: params.stop,
           tools: params.tools,
           tool_choice: params.tool_choice,
+          morf: params.morf,
+          metadata: params.metadata,
+          prompt_cache_key: params.prompt_cache_key,
+          parallel_tool_calls: params.parallel_tool_calls,
         };
 
         const res = await this.request('/chat/completions', {
@@ -117,7 +171,7 @@ export class MorfClient {
           if (!res.body) {
             throw new MorfError('La respuesta del servidor no tiene cuerpo legible para streaming', res.status);
           }
-          return parseEventStream(res.body as unknown as ReadableStream<Uint8Array>);
+          return parseEventStream(res.body as unknown as ReadableStream<Uint8Array>, this.timeout);
         }
 
         return (await res.json()) as ChatCompletionResponse;

@@ -28,6 +28,18 @@ export interface ChatCompletionOptions {
   stop?: string | string[];
   tools?: any[];
   tool_choice?: any;
+  morf?: {
+    conversation_id?: string;
+    request_id?: string;
+    progress?: boolean;
+    memory?: boolean | { enabled?: boolean; scope?: 'project' | 'conversation'; version?: number };
+    routing?: Record<string, unknown>;
+    media?: boolean | { kind?: 'image' | 'video'; duration?: number; max_cost_usd?: number };
+    executor?: { type: 'client'; working_directory: string; tools: any[]; timeout_seconds?: number };
+  };
+  metadata?: Record<string, string>;
+  prompt_cache_key?: string;
+  parallel_tool_calls?: boolean;
 }
 
 export interface ChatCompletionChoice {

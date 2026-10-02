@@ -63,6 +63,61 @@ class MorfClient {
         }
     }
     // --- Namespace Chat ---
+    async json(path, body) {
+        const response = await this.request(path, body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) });
+        const data = await response.json();
+        if (!response.ok)
+            throw new MorfError(data?.error?.message || data?.error?.code || `HTTP ${response.status}`, response.status, data);
+        return data;
+    }
+    memory = {
+        snapshot: (morf = {}) => this.json('/memory/snapshot', { morf }),
+        delete: (morf = {}) => this.json('/memory/delete', { morf }),
+    };
+    capabilities = {
+        list: () => this.json('/capabilities'),
+        execute: (name, arguments_) => this.json('/capabilities/execute', { name, arguments: arguments_ }),
+    };
+    runs = {
+        create: (params) => this.json('/runs', params),
+        get: (runId) => this.json(`/runs/${encodeURIComponent(runId)}`),
+        cancel: (runId) => this.json(`/runs/${encodeURIComponent(runId)}/cancel`, {}),
+        toolRequest: (runId, callId) => this.json(`/runs/${encodeURIComponent(runId)}/tools/${encodeURIComponent(callId)}`),
+        toolResult: (runId, callId, result) => this.json(`/runs/${encodeURIComponent(runId)}/tools/${encodeURIComponent(callId)}/result`, result),
+        events: async (runId, after = 0) => {
+            const response = await this.request(`/runs/${encodeURIComponent(runId)}/events?after=${Math.max(0, after)}`);
+            if (!response.ok || !response.body)
+                throw new MorfError('No se pudo abrir el flujo de eventos', response.status);
+            return (0, stream_1.parseRunEvents)(response.body, this.timeout);
+        },
+        work: async (runId, executor, onEvent) => {
+            const pending = new Set();
+            let terminal;
+            for await (const event of await this.runs.events(runId)) {
+                onEvent?.(event);
+                if (['run.completed', 'run.failed', 'run.cancelled'].includes(event.type))
+                    terminal = event;
+                if (event.type !== 'tool.requested')
+                    continue;
+                const work = (async () => {
+                    const task = await this.runs.toolRequest(runId, event.call_id);
+                    let result;
+                    try {
+                        result = { content: await executor(task.tool_name, task.arguments) };
+                    }
+                    catch (error) {
+                        result = { content: String(error?.message || error), is_error: true };
+                    }
+                    await this.runs.toolResult(runId, event.call_id, result);
+                })();
+                pending.add(work);
+                work.then(() => pending.delete(work), () => { });
+            }
+            await Promise.all(pending);
+            if (terminal?.type !== 'run.completed')
+                throw new MorfError(terminal?.error || 'El run no se completo', 502, terminal);
+        },
+    };
     chat = {
         completions: {
             create: (async (params) => {
@@ -78,6 +133,10 @@ class MorfClient {
                     stop: params.stop,
                     tools: params.tools,
                     tool_choice: params.tool_choice,
+                    morf: params.morf,
+                    metadata: params.metadata,
+                    prompt_cache_key: params.prompt_cache_key,
+                    parallel_tool_calls: params.parallel_tool_calls,
                 };
                 const res = await this.request('/chat/completions', {
                     method: 'POST',
@@ -100,7 +159,7 @@ class MorfClient {
                     if (!res.body) {
                         throw new MorfError('La respuesta del servidor no tiene cuerpo legible para streaming', res.status);
                     }
-                    return (0, stream_1.parseEventStream)(res.body);
+                    return (0, stream_1.parseEventStream)(res.body, this.timeout);
                 }
                 return (await res.json());
             }),
